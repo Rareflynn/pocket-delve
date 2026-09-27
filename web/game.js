@@ -54,7 +54,7 @@ function newGame() {
     rebirths: 0, settings: { onTop: true, compact: false, mini: false, size: 'medium', autoUpg: false, autoForge: false, autoRebirth: false, rebirthStuck: 5, autoPerks: true,
       // loot notifications: minimum rarity (99 = off) + modifier toggle, for equipped and sold items
       nEqR: 3, nEqMod: true, nSoldR: 6, nSoldMod: true,
-      sound: false, volume: 0.5, sci: false, mute: {}, buyMode: 1, fade: 100, clickThrough: false, corner: 'br' },
+      sound: false, volume: 0.5, sci: false, mute: {}, buyMode: 1, fade: 100, clickThrough: false, corner: 'br', discord: true },
     stats: { kills: 0, bossKills: 0, items: 0, equipped: 0, gold: 0, time: 0, cookies: 0, chests: 0, amulets: 0, bestR: 0, bestAm: -1, maxLvl: 1 }, rates: { gold: 0, xp: 0, kills: 0 },
     lastSave: Date.now(), chestT: 90, cookieT: 150, stuckT: 0, log: [],
     finds: [],  // 🏆 catalogue of extremely rare drops, kept for the whole save (survives rebirths)
@@ -2616,6 +2616,22 @@ const heroIcon = () => {
   if (heroIconUrl && heroIconKey === k) return heroIconUrl;
   heroIconKey = k; return (heroIconUrl = heroCanvas(false, 0).toDataURL());
 };
+// 🎮 Discord Rich Presence: app.py passes this to the Discord app (desktop only)
+// Zone pictures live in the GitHub repo (discord/zones/<slug>.png, made by tools/zone_art.js), so a new zone needs its picture rendered and pushed.
+const DISCORD_ART = 'https://raw.githubusercontent.com/Rareflynn/pocket-delve/main/discord/zones/';
+const zoneSlug = z => z.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+function discordPresence() {
+  if (!G.settings.discord) return Bridge.call('presence', '', '', '');
+  const R = RT && RT.rush, CH = chalDef(), lap = zoneTier(G.floor), Z = R ? ZONES[R.zi] : zoneOf(G.floor);
+  const details = R ? `☠ Boss Rush ${R.k + 1}/${RUSH_LIST.length}`
+    : CH ? `${CH.icon} ${CH.name}: floor ${G.floor}/${CH.goal}`
+    : `Floor ${G.floor}${lap ? ` · Lap ${roman(lap + 1)}` : ''}`;
+  const doing = RT && RT.isBoss && RT.phase === 'fight' ? 'Boss fight' : G.farm ? 'Farming' : replaying() ? 'Replaying' : 'Delving';
+  const state = `${Z.name} · ${doing}`;
+  const big = `Level ${G.hero.lvl} · deepest floor ${Math.max(G.maxFloor, G.bestFloor)}${G.rebirths ? ` · ${G.rebirths} rebirths` : ''}`;
+  Bridge.call('presence', details, state, big, DISCORD_ART + zoneSlug(Z) + '.png');
+}
+
 function updateTop() {
   const f = G.floor, z = zoneOf(f);
   const lap = zoneTier(f), SP = RT && RT.special && SPECIAL_STAGES[RT.special], CH = chalDef(), R = RT && RT.rush;
@@ -3158,6 +3174,7 @@ PANELS.settings = () => {
       <div class="set">Snap to corner: ${[['tl', '↖'], ['tr', '↗'], ['bl', '↙'], ['br', '↘']].map(([c, i]) => `<button class="sm ${(S.corner || 'br') === c ? 'on' : ''}" data-act="corner" data-id="${c}">${i}</button>`).join(' ')}</div>
       <div class="set">When the mouse is away, fade to ${sel('fade', [[100, 'off'], [80, '80%'], [60, '60%'], [40, '40%'], [25, '25%']])}</div>
       ${chk('clickThrough', '…and let clicks pass through while faded', 'Clicks go to whatever is behind the game until you move the mouse over it')}
+      ${chk('discord', 'Show on Discord (floor, lap and zone in your profile)', 'Discord Rich Presence. Needs the Discord desktop app running')}
       <div class="small dim">▭ in the title bar cycles normal → compact → mini (just the floor, health and gold).</div>`
       : '<p class="dim small">Running in a browser. Launch with PocketDelve.pyw for the always-on-top window and its window options.</p>',
     sound: () => `${chk('sound', 'Sound effects (rare drops, bosses, achievements, gems)')}
@@ -3271,7 +3288,7 @@ const ACTIONS = {
   perkBuyMode: d => { G.settings.perkBuyMode = d.id === 'max' ? 'max' : +d.id; },
   upg: d => buyUpgradeBulk(d.id),
   skill: (d, el) => { if (G.skills[d.id]) G.skills[d.id].on = el.checked; },
-  toggle: (d, el) => { G.settings[d.id] = el.checked; if (d.id === 'clickThrough') applyFade(); if (d.id === 'autoTemper' && el.checked) autoTemperStash(); if (d.id === 'sound' && el.checked) sfx('ach'); if (el.checked) automation(); },
+  toggle: (d, el) => { G.settings[d.id] = el.checked; if (d.id === 'clickThrough') applyFade(); if (d.id === 'autoTemper' && el.checked) autoTemperStash(); if (d.id === 'sound' && el.checked) sfx('ach'); if (d.id === 'discord') discordPresence(); if (el.checked) automation(); },
   askRebirth: () => { ui.confirm = 'rebirth'; },
   star: d => buyStar(d.id),
   askAwaken: () => { ui.confirm = 'awaken'; },
@@ -3486,6 +3503,8 @@ async function boot() {
   if (Bridge.api) {
     setTimeout(() => { Bridge.call('backup', saveData(), 'auto'); applyFade(); }, 3000);
     setInterval(() => Bridge.call('backup', saveData(), 'auto'), 30 * 60 * 1000);
+    setTimeout(discordPresence, 2000);
+    setInterval(discordPresence, 15000);
   }
   setInterval(save, 15000);
   addEventListener('beforeunload', save);

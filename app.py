@@ -171,6 +171,89 @@ def remember_geometry():
         pass
 
 
+# ---------------- Discord Rich Presence ----------------
+# Talks to the local Discord app over its IPC pipe (no extra packages). The game hands over what to show
+# via Api.presence(); a background thread connects when Discord is running and resends when it changes.
+DISCORD_APP_ID = '1553779549375037510'  # Application ID from https://discord.com/developers/applications
+presence = {'activity': None, 'sent': None, 'start': None}
+
+
+class DiscordIPC:
+    def __init__(self):
+        self.pipe = None
+
+    def frame(self, op, payload):
+        import struct
+        body = json.dumps(payload).encode('utf-8')
+        self.pipe.write(struct.pack('<II', op, len(body)) + body)
+        self.pipe.flush()
+        op, n = struct.unpack('<II', self.pipe.read(8))
+        return json.loads(self.pipe.read(n) or b'{}')
+
+    def connect(self):
+        for i in range(10):
+            try:
+                self.pipe = open(rf'\\.\pipe\discord-ipc-{i}', 'r+b', buffering=0)
+            except OSError:
+                continue
+            try:
+                if self.frame(0, {'v': 1, 'client_id': DISCORD_APP_ID}).get('evt') == 'READY':
+                    return True
+            except Exception:
+                pass
+            self.close()
+        return False
+
+    def set_activity(self, activity):
+        import uuid
+        self.frame(1, {'cmd': 'SET_ACTIVITY', 'args': {'pid': os.getpid(), 'activity': activity}, 'nonce': str(uuid.uuid4())})
+
+    def close(self):
+        try:
+            self.pipe.close()
+        except Exception:
+            pass
+        self.pipe = None
+
+
+art_ok = {}  # picture URL -> is it online yet (a new zone's picture only exists once it's pushed)
+
+
+def with_art(activity):
+    url = (activity or {}).get('assets', {}).get('large_image', '')
+    if not url.startswith('https://'):
+        return activity
+    import time
+    if url not in art_ok or (art_ok[url] is not True and time.time() > art_ok[url]):
+        import urllib.request
+        try:
+            urllib.request.urlopen(urllib.request.Request(url, method='HEAD'), timeout=5)
+            art_ok[url] = True
+        except Exception:
+            art_ok[url] = time.time() + 600  # not there (yet): ask again in 10 minutes
+    if art_ok[url] is True:
+        return activity
+    a = dict(activity, assets=dict(activity['assets'], large_image='logo'))
+    del a['assets']['small_image'], a['assets']['small_text']
+    return a
+
+
+def presence_loop():
+    ipc = DiscordIPC()
+    while True:
+        try:
+            want = with_art(presence['activity'])
+            if want and not ipc.pipe:
+                if ipc.connect():
+                    presence['sent'] = None
+            if ipc.pipe and want != presence['sent']:
+                ipc.set_activity(want or None)  # {} = cleared (turned off in settings)
+                presence['sent'] = want
+        except Exception:
+            ipc.close()  # Discord closed or restarted: try again later
+        threading.Event().wait(15)
+
+
 # ---------------- JS API ----------------
 class Api:
     def load(self):
@@ -271,6 +354,21 @@ class Api:
     def open_backups(self):
         os.startfile(BACKUP_DIR)
 
+    def presence(self, details, state, big_text, image='logo'):
+        """What Discord shows under your name. Empty details = show nothing. image: an https URL (zone picture) or an uploaded asset name."""
+        if not details:
+            presence['activity'] = {}
+            return
+        if presence['start'] is None:
+            import time
+            presence['start'] = int(time.time())
+        presence['activity'] = {
+            'details': str(details)[:128], 'state': str(state)[:128],
+            'timestamps': {'start': presence['start']},
+            'assets': {'large_image': str(image)[:256], 'large_text': str(big_text)[:128],
+                       'small_image': 'logo', 'small_text': 'Pocket Delve'},
+        }
+
 
 save_data = read_json(SAVE_FILE, {})
 on_top = save_data.get('settings', {}).get('onTop', True) if isinstance(save_data, dict) else True
@@ -310,4 +408,6 @@ if __name__ == '__main__':
     clear_web_cache()
     threading.Timer(6, failsafe_show).start()
     threading.Thread(target=fade_loop, daemon=True).start()
+    if DISCORD_APP_ID and not os.environ.get('POCKETDELVE_TITLE'):  # test instances stay quiet
+        threading.Thread(target=presence_loop, daemon=True).start()
     webview.start(private_mode=False, storage_path=DATA_DIR)

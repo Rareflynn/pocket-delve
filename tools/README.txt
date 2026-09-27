@@ -13,6 +13,11 @@ Codex (reference page, published at https://claude.ai/artifact/MPt6Bc3Ns4hePnj4M
   python simfile.py extract.js > game_data.json
   python build_ref.py                  (writes pocket_delve_codex.html)
 
+Discord zone pictures (discord\zones\<slug>.png, 512x512: background + Lord + hero):
+  python zone_art.py                   makes pictures for zones that don't have one (the git pre-commit hook runs this)
+  python zone_art.py --all             redraws every zone (after changing a zone's look or Lord)
+  The game links them from raw.githubusercontent.com, so they show on Discord once pushed.
+
 Sim rules of thumb:
   - Fast mode: simFast = true; G.settings.sound = false; simulate(60, 0.1) per sim-minute (~3.7x faster, same results).
   - A hidden/background window triggers goAway() (farm-only): override goAway = () => {} first.

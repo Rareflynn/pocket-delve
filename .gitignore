@@ -1,5 +1,6 @@
 __pycache__/
 *.pyc
 snapshots/
+tools/pd/
 save*.json
 !tools/sim_snapshot_17h.json

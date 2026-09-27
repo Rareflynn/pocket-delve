@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pocket Delve</title>
+<link rel="stylesheet" href="style.css?v=76">
+</head>
+<body>
+<header id="top">
+  <div class="drag pywebview-drag-region" id="floor"></div>
+  <div class="drag pywebview-drag-region" id="miniHp"><i></i></div>
+  <div class="drag pywebview-drag-region cur"><span class="g">💰 <b id="gold">0</b></span><span id="soulsWrap" class="s" hidden>✦ <b id="souls">0</b></span><span id="gemsWrap" class="gm" hidden title="Gems (🛡 Hero → 💎)">💎 <b id="gems">0</b></span></div>
+  <div class="btns">
+    <button data-panel="hero" title="Hero & gear">🛡</button>
+    <button data-panel="upg" id="upgBtn" title="Upgrades">⬆</button>
+    <button data-panel="forge" id="forgeBtn" title="Forge: reinforce gear, mystery chests" hidden>⚒</button>
+    <button data-panel="rebirth" id="rbBtn" title="Rebirth" hidden>✦</button>
+    <button data-panel="modes" id="modeBtn" title="Adventures: challenges, Boss Rush, expeditions & the lab" hidden>🏁</button>
+    <button data-panel="settings" title="Settings">⚙</button>
+    <span class="wc">
+      <button data-act="compact" title="Window mode: normal → compact → mini">▭</button>
+      <button data-act="fullscreen" id="fsBtn" title="Full screen (Esc to exit)">⛶</button>
+      <button data-act="min" title="Minimise">–</button>
+      <button data-act="close" class="x" title="Save & close">✕</button>
+    </span>
+  </div>
+</header>
+<div id="stage">
+  <canvas id="scene"></canvas>
+  <div id="toasts"></div>
+  <div id="buffs"></div>
+  <div id="panel" hidden></div>
+  <div id="modal" hidden></div>
+</div>
+<footer id="bar">
+  <div id="party"></div>
+  <button id="pushBtn" data-act="push"></button>
+  <button id="speedBtn" data-act="speed" hidden></button>
+  <div id="ticker" class="drag pywebview-drag-region"></div>
+</footer>
+<script src="data.js?v=85"></script>
+<script src="game.js?v=101"></script>
+</body>
+</html>

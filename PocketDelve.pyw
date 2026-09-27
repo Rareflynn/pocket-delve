@@ -1,0 +1,5 @@
+# Double-click to play (runs without a console window).
+import os
+import runpy
+
+runpy.run_path(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'app.py'), run_name='__main__')
